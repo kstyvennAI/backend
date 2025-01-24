@@ -2,11 +2,12 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 import openai
 import PyPDF2
-
+import os
 app = FastAPI()
 
 # Configure sua API Key do OpenAI
-openai.api_key = "sua_api_key"
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 @app.post("/upload")
 async def process_slide(file: UploadFile = File(...)):
