@@ -89,6 +89,7 @@ def generate_summary_with_gpt4(text):
         print(f"Erro na API OpenAI: {e}")
         raise HTTPException(status_code=500, detail="Erro ao se comunicar com a API OpenAI.")
 
+
 def generate_mind_map_html(summary):
     try:
         mind_map = f"""
