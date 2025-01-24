@@ -22,6 +22,10 @@ app.add_middleware(
 @app.post("/upload")
 async def process_slide(file: UploadFile = File(...)):
     try:
+        # Verifica se o arquivo enviado é um PDF válido
+        if file.content_type != "application/pdf":
+            raise HTTPException(status_code=400, detail="O arquivo enviado não é um PDF válido.")
+
         # Salva o arquivo temporariamente no sistema
         file_location = f"/tmp/{file.filename}"
         with open(file_location, "wb") as f:
@@ -30,10 +34,6 @@ async def process_slide(file: UploadFile = File(...)):
         # Verifica se o arquivo foi salvo corretamente
         if not os.path.exists(file_location):
             raise HTTPException(status_code=500, detail="Falha ao salvar o arquivo enviado.")
-
-        # Verifica se o arquivo é realmente um PDF
-        if file.content_type != "application/pdf":
-            raise HTTPException(status_code=400, detail="O arquivo enviado não é um PDF válido.")
 
         # Extrai o texto do PDF
         pdf_text = extract_text_from_pdf(file_location)
@@ -57,7 +57,6 @@ async def process_slide(file: UploadFile = File(...)):
         print(f"Erro ao processar o arquivo: {e}")
         raise HTTPException(status_code=500, detail="Erro interno ao processar o arquivo.")
 
-
 def extract_text_from_pdf(file_path):
     try:
         text = ""
@@ -70,11 +69,10 @@ def extract_text_from_pdf(file_path):
         return text
     except PyPDF2.errors.PdfReadError as e:
         print(f"Erro ao ler o PDF: {e}")
-        return None
+        raise HTTPException(status_code=400, detail="Erro ao ler o arquivo PDF.")
     except Exception as e:
         print(f"Erro inesperado ao processar o PDF: {e}")
-        return None
-
+        raise HTTPException(status_code=500, detail="Erro ao processar o arquivo.")
 
 def generate_summary_with_gpt4(text):
     try:
@@ -87,7 +85,6 @@ def generate_summary_with_gpt4(text):
     except Exception as e:
         print(f"Erro na API OpenAI: {e}")
         raise HTTPException(status_code=500, detail="Erro ao se comunicar com a API OpenAI.")
-
 
 def generate_mind_map_html(summary):
     try:
