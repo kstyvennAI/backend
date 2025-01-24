@@ -76,12 +76,15 @@ def extract_text_from_pdf(file_path):
 
 def generate_summary_with_gpt4(text):
     try:
-        response = openai.Completion.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
-            prompt=f"Resuma o seguinte conteúdo em um formato didático e organizado:\n\n{text}",
+            messages=[
+                {"role": "system", "content": "Você é um assistente."},
+                {"role": "user", "content": f"Resuma o seguinte conteúdo em um formato didático e organizado:\n\n{text}"}
+            ],
             max_tokens=500,
         )
-        return response.choices[0].text.strip()
+        return response['choices'][0]['message']['content'].strip()
     except Exception as e:
         print(f"Erro na API OpenAI: {e}")
         raise HTTPException(status_code=500, detail="Erro ao se comunicar com a API OpenAI.")
