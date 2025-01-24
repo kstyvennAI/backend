@@ -8,6 +8,15 @@ app = FastAPI()
 # Configure sua API Key do OpenAI
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Ou substitua por ["https://<seu-frontend>.github.io"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/upload")
 async def process_slide(file: UploadFile = File(...)):
