@@ -1,61 +1,84 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import openai
 import PyPDF2
 import os
+
 app = FastAPI()
 
-# Configure sua API Key do OpenAI
-
+# Configuração da API Key do OpenAI
 openai.api_key = os.getenv("OPENAI_API_KEY")
-from fastapi.middleware.cors import CORSMiddleware
 
+# Configuração do CORS para permitir conexões do frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Ou substitua por ["https://<seu-frontend>.github.io"]
+    allow_origins=["*"],  # Substitua por ["https://<seu-frontend>.github.io"] para mais segurança
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 @app.post("/upload")
 async def process_slide(file: UploadFile = File(...)):
-    # Salva o arquivo temporariamente
-    with open(file.filename, "wb") as f:
-        f.write(await file.read())
+    try:
+        # Salva o arquivo temporariamente
+        file_location = f"/tmp/{file.filename}"
+        with open(file_location, "wb") as f:
+            f.write(await file.read())
 
-    # Extrai o texto do PDF
-    pdf_text = extract_text_from_pdf(file.filename)
+        # Extrai o texto do PDF
+        pdf_text = extract_text_from_pdf(file_location)
+        if not pdf_text:
+            raise HTTPException(status_code=400, detail="Não foi possível extrair texto do PDF.")
 
-    # Envia o texto para o GPT-4 para resumo e mapa mental
-    summary = generate_summary_with_gpt4(pdf_text)
-    mind_map_html = generate_mind_map_html(summary)
+        # Envia o texto para a API GPT-4
+        summary = generate_summary_with_gpt4(pdf_text)
+        mind_map_html = generate_mind_map_html(summary)
 
-    return JSONResponse(content={"summary": summary, "map": mind_map_html})
+        # Retorna a resposta para o frontend
+        return JSONResponse(content={"summary": summary, "map": mind_map_html})
+
+    except Exception as e:
+        # Log detalhado para depuração
+        print(f"Erro ao processar o arquivo: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno ao processar o arquivo.")
 
 
 def extract_text_from_pdf(file_path):
-    text = ""
-    with open(file_path, "rb") as f:
-        reader = PyPDF2.PdfReader(f)
-        for page in reader.pages:
-            text += page.extract_text()
-    return text
+    try:
+        text = ""
+        with open(file_path, "rb") as f:
+            reader = PyPDF2.PdfReader(f)
+            for page in reader.pages:
+                text += page.extract_text()
+        return text
+    except Exception as e:
+        print(f"Erro ao extrair texto do PDF: {e}")
+        return None
 
 
 def generate_summary_with_gpt4(text):
-    response = openai.Completion.create(
-        model="gpt-4",
-        prompt=f"Resuma o seguinte conteúdo em um formato didático e organizado:\n\n{text}",
-        max_tokens=500,
-    )
-    return response.choices[0].text.strip()
+    try:
+        response = openai.Completion.create(
+            model="gpt-4",
+            prompt=f"Resuma o seguinte conteúdo em um formato didático e organizado:\n\n{text}",
+            max_tokens=500,
+        )
+        return response.choices[0].text.strip()
+    except Exception as e:
+        print(f"Erro na API OpenAI: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao se comunicar com a API OpenAI.")
 
 
 def generate_mind_map_html(summary):
-    # Converte o resumo para um gráfico Mermaid
-    mind_map = f"""
+    try:
+        mind_map = f"""
         graph TD
         A[Resumo Didático] -->|Resumo| B[{summary[:50]}...]
-    """
-    return mind_map
+        """
+        return mind_map
+    except Exception as e:
+        print(f"Erro ao gerar o mapa mental: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao gerar o mapa mental.")
