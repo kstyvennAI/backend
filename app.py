@@ -19,14 +19,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.post("/upload")
 async def process_slide(file: UploadFile = File(...)):
     try:
-        # Salva o arquivo temporariamente
+        # Salva o arquivo temporariamente no sistema
         file_location = f"/tmp/{file.filename}"
         with open(file_location, "wb") as f:
             f.write(await file.read())
+
+        # Verifica se o arquivo foi salvo corretamente
+        if not os.path.exists(file_location):
+            raise HTTPException(status_code=500, detail="Falha ao salvar o arquivo enviado.")
+
+        # Verifica se o arquivo é realmente um PDF
+        if file.content_type != "application/pdf":
+            raise HTTPException(status_code=400, detail="O arquivo enviado não é um PDF válido.")
 
         # Extrai o texto do PDF
         pdf_text = extract_text_from_pdf(file_location)
@@ -37,9 +44,14 @@ async def process_slide(file: UploadFile = File(...)):
         summary = generate_summary_with_gpt4(pdf_text)
         mind_map_html = generate_mind_map_html(summary)
 
+        # Remove o arquivo temporário
+        os.remove(file_location)
+
         # Retorna a resposta para o frontend
         return JSONResponse(content={"summary": summary, "map": mind_map_html})
 
+    except PyPDF2.errors.PdfReadError:
+        raise HTTPException(status_code=400, detail="Erro ao ler o arquivo PDF. O arquivo pode estar corrompido.")
     except Exception as e:
         # Log detalhado para depuração
         print(f"Erro ao processar o arquivo: {e}")
@@ -53,9 +65,14 @@ def extract_text_from_pdf(file_path):
             reader = PyPDF2.PdfReader(f)
             for page in reader.pages:
                 text += page.extract_text()
+        if not text:
+            raise ValueError("Nenhum texto encontrado no PDF.")
         return text
+    except PyPDF2.errors.PdfReadError as e:
+        print(f"Erro ao ler o PDF: {e}")
+        return None
     except Exception as e:
-        print(f"Erro ao extrair texto do PDF: {e}")
+        print(f"Erro inesperado ao processar o PDF: {e}")
         return None
 
 
